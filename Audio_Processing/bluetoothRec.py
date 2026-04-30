@@ -7,7 +7,8 @@ import time
 PORT = "COM4"  # Change this to your ESP32 Bluetooth COM Port
 BAUD = 921600  # Note: Bluetooth ignores this, but pyserial requires it
 SAMPLE_RATE = 8000
-DURATION = 5   # Seconds to record
+CHUNK_SIZE = 256
+DURATION = 20   # Seconds to record
 OUTPUT_FILE = "bluetooth_recording.wav"
 
 def record_bt_audio():
@@ -35,6 +36,13 @@ def record_bt_audio():
                 # This handles timeouts or partial reads
                 print("Warning: Dropped sample or timeout.")
                 break
+
+            raw_data = ser.read(CHUNK_SIZE * 2)
+            
+            if len(raw_data) > 0:
+                # Convert bytes to numpy array (uint16)
+                audio_data = np.frombuffer(raw_data, dtype=np.uint16)
+                data.extend(audio_data.tolist())
 
         print("Recording finished. Processing...")
         ser.close()
