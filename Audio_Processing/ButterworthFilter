@@ -1,0 +1,72 @@
+import serial
+import numpy as np
+import pyaudio
+from scipy.signal import butter, lfilter
+
+# --- CONFIGURATION ---
+PORT = "COM4" 
+BAUD = 921600
+SAMPLE_RATE = 8000
+CHUNK_SIZE = 512  # Increased for better filter stability
+
+# --- FILTER SETUP ---
+def butter_bandpass(lowcut, highcut, fs, order=5):
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = butter(order, [low, high], btype='band')
+    return b, a
+
+def apply_filter(data, b, a):
+    return lfilter(b, a, data)
+
+# Heart sounds are low: 20Hz to 150Hz
+b, a = butter_bandpass(20, 150, SAMPLE_RATE, order=4)
+
+# --- AUDIO SETUP ---
+p = pyaudio.PyAudio()
+stream = p.open(format=pyaudio.paInt16,
+                channels=1,
+                rate=SAMPLE_RATE,
+                output=True,
+                frames_per_buffer=CHUNK_SIZE)
+
+def stream_heart_sounds():
+    try:
+        ser = serial.Serial(PORT, BAUD, timeout=1)
+        ser.flushInput()
+        print("Listening for heart sounds... (Filtered 20Hz-150Hz)")
+
+        while True:
+            raw_data = ser.read(CHUNK_SIZE * 2)
+            if len(raw_data) == CHUNK_SIZE * 2:
+                # 1. Convert to numpy
+                audio_data = np.frombuffer(raw_data, dtype=np.uint16)
+                
+                # 2. Normalize and center (Float64 for filtering math)
+                # We convert to float to avoid rounding errors during math
+                float_data = (audio_data.astype(np.float64) - 2048) / 2048.0
+                
+                # 3. Apply the Filter
+                filtered_data = apply_filter(float_data, b, a)
+                
+                # 4. Boost Volume (Heart sounds are very quiet)
+                # Gain of 5-10x is usually needed for stethoscopes
+                boosted_data = filtered_data * 8.0
+                
+                # 5. Clip and convert back to Int16
+                boosted_data = np.clip(boosted_data, -1, 1)
+                final_audio = (boosted_data * 32767).astype(np.int16)
+                
+                stream.write(final_audio.tobytes())
+
+    except KeyboardInterrupt:
+        print("\nStopped.")
+    finally:
+        stream.stop_stream()
+        stream.close()
+        p.terminate()
+        ser.close()
+
+if __name__ == "__main__":
+    stream_heart_sounds()
