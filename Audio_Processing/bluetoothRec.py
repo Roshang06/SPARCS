@@ -2,6 +2,7 @@ import serial
 import numpy as np
 import wave
 import time
+import matplotlib.pyplot as plt
 
 # --- CONFIGURATION ---
 PORT = "COM4"  # Change this to your ESP32 Bluetooth COM Port
@@ -25,24 +26,15 @@ def record_bt_audio():
         print(f"Recording {DURATION} seconds of audio...")
         
         while len(data) < num_samples:
-            # Read 2 bytes (one 16-bit sample)
-            raw = ser.read(2)
-            
-            if len(raw) == 2:
-                # Convert bytes to unsigned 16-bit integer
-                value = int.from_bytes(raw, byteorder='little')
-                data.append(value)
-            else:
-                # This handles timeouts or partial reads
-                print("Warning: Dropped sample or timeout.")
-                break
-
             raw_data = ser.read(CHUNK_SIZE * 2)
             
             if len(raw_data) > 0:
                 # Convert bytes to numpy array (uint16)
                 audio_data = np.frombuffer(raw_data, dtype=np.uint16)
                 data.extend(audio_data.tolist())
+            else:
+                print("Warning: Timeout or no data received.")
+                break
 
         print("Recording finished. Processing...")
         ser.close()
@@ -67,8 +59,34 @@ def record_bt_audio():
 
         print(f"Success! Saved to {OUTPUT_FILE}")
 
+        return audio_signed, SAMPLE_RATE
+
     except Exception as e:
         print(f"Error: {e}")
 
 if __name__ == "__main__":
-    record_bt_audio()
+    audio_signal, fs = record_bt_audio()
+
+    if audio_signal is not None:
+        # Create a time axis in seconds
+        time_axis = np.linspace(0, len(audio_signal) / fs, num=len(audio_signal))
+
+        # --- PLOT PHONOCARDIOGRAM ---
+        plt.figure(figsize=(15, 6))
+        plt.plot(time_axis, audio_signal, color='#2c3e50', linewidth=0.5)
+        
+        # Formatting the PCG
+        plt.title("Phonocardiogram (PCG) - Heart Sound Waveform", fontsize=14)
+        plt.xlabel("Time (seconds)", fontsize=12)
+        plt.ylabel("Amplitude (ADC Units)", fontsize=12)
+        plt.grid(True, alpha=0.3)
+        
+        # Zoom into a 3-second window to see individual heart beats (S1/S2)
+        # You can remove this line to see the full 20 seconds
+        #plt.xlim(2, 5) 
+        
+        plt.tight_layout()
+        plt.show()
+
+
+
