@@ -3,12 +3,14 @@ import numpy as np
 import pyaudio
 
 # --- CONFIGURATION ---
+
 PORT = "COM4"  # Change to your ESP32 Bluetooth port
 BAUD = 921600
 SAMPLE_RATE = 8000
-CHUNK_SIZE = 64  # Matches the BLOCK_SIZE from ESP32 code
+CHUNK_SIZE = 256  # Number of samples to process at once
 
 # --- AUDIO SETUP ---
+
 p = pyaudio.PyAudio()
 stream = p.open(format=pyaudio.paInt16,
                 channels=1,
@@ -23,36 +25,30 @@ def stream_audio():
         ser.flushInput()
         print("Streaming live audio... Press Ctrl+C to stop.")
 
-        bytes_to_read = CHUNK_SIZE * 2  # 2 bytes per 16-bit sample
-
         while True:
-            # Read exactly one chunk of data
-            raw_data = ser.read(bytes_to_read)
-            
-            # Check if we got a complete block of data
-            if len(raw_data) == bytes_to_read:
-                # 1. Convert bytes directly to signed 16-bit integers
-                audio_data = np.frombuffer(raw_data, dtype=np.int16)
-                
-                # Write directly to the PyAudio output stream
-                stream.write(audio_data.tobytes())
-            else:
-                # If a timeout or partial read happens, skip to maintain alignment
-                continue
+            # Read a chunk of data (2 bytes per sample)
+            raw_data = ser.read(CHUNK_SIZE * 2)   
 
+            if len(raw_data) > 0:
+                # Convert bytes to numpy array (uint16)
+                audio_data = np.frombuffer(raw_data, dtype=np.uint16)   
+                # Convert 12-bit unsigned to 16-bit signed (same logic as before)
+                # Subtract midpoint and shift to fill 16-bit range
+
+                processed_audio = (audio_data.astype(np.int16) - 2048) << 4    
+
+                # Write to the audio output stream
+                stream.write(processed_audio.tobytes())
     except KeyboardInterrupt:
         print("\nStream stopped by user.")
     except Exception as e:
         print(f"Error: {e}")
     finally:
         print("Closing resources...")
-        try:
-            stream.stop_stream()
-            stream.close()
-            p.terminate()
-        except:
-            pass
-        if 'ser' in locals() and ser.is_open:
+        stream.stop_stream()
+        stream.close()
+        p.terminate()
+        if 'ser' in locals():
             ser.close()
 
 if __name__ == "__main__":
