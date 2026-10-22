@@ -8,8 +8,8 @@ NOT TESTED:
     macOS:   /dev/cu.ESP32_Audio_Link
     Linux:   sudo rfcomm connect /dev/rfcomm0 <ESP32 MAC>   (then /dev/rfcomm0)
 3. Run:
-     python bt_audio_player.py --list
-     python bt_audio_player.py COM5 --delay 1.5
+     python memsv2.py --list
+     python memsv2.py COM5 --delay 1.5
 """
 
 import argparse

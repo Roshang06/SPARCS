@@ -23,8 +23,8 @@ Creating a virtual environment is recommended to keep your project dependencies 
 
 **On Windows:**
 ```bash
-python -m venv venv
-venv\Scripts\activate
+python -m venv .venv
+.venv\Scripts\activate
 ```
 
 **On macOS/Linux:**
@@ -41,13 +41,4 @@ Install all required dependencies using pip:
 pip install -r requirements.txt
 ```
 
-**Required packages:**
-- `pyserial` - Serial communication with ESP32
-- `numpy` - Audio signal processing
-- `pyaudio` - Real-time audio playback and capture
-
-If you prefer to install manually:
-```bash
-pip install pyserial numpy pyaudio
-```
 Arduino scripts are found in the ArduinoFiles Folder
